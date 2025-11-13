@@ -7,12 +7,24 @@ from app.api.endpoints import router as api_router
 from app.core.security import get_bearer_token
 from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: HTTP client is created on first use
+    logger.info("Starting up Document Ingestion Router")
+    yield
+    # Shutdown: Clean up HTTP client
+    await TikaService.close_client()
+    logger.info("Shut down Document Ingestion Router")
 
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="A service to route document loading requests to appropriate Tika endpoints",
-    version="1.0.0",
+    version="1.0.1",
+    lifespan=lifespan,
 )
 
 # Initialize Prometheus monitoring

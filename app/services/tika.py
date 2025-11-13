@@ -1,5 +1,5 @@
 from app.config import settings
-import requests
+import httpx
 from typing import Dict, Any, Tuple
 import mimetypes
 from loguru import logger
@@ -11,13 +11,47 @@ import magic
 
 
 class TikaService:
+    _client: httpx.AsyncClient = None
+
     def __init__(self):
         self.base_url = settings.tika_url_with_auth.rstrip("/")
 
+    @classmethod
+    def get_client(cls) -> httpx.AsyncClient:
+        """Get or create a shared async HTTP client with connection pooling"""
+        if cls._client is None:
+            cls._client = httpx.AsyncClient(
+                limits=httpx.Limits(
+                    max_connections=settings.HTTP_MAX_CONNECTIONS,
+                    max_keepalive_connections=settings.HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                    keepalive_expiry=settings.HTTP_KEEPALIVE_EXPIRY,
+                ),
+                timeout=httpx.Timeout(
+                    connect=settings.HTTP_TIMEOUT_CONNECT,
+                    read=settings.HTTP_TIMEOUT_READ,
+                    write=settings.HTTP_TIMEOUT_WRITE,
+                    pool=settings.HTTP_TIMEOUT_POOL,
+                ),
+                http2=settings.HTTP_ENABLE_HTTP2,
+            )
+            logger.info(
+                f"HTTP client initialized with max_connections={settings.HTTP_MAX_CONNECTIONS}, "
+                f"keepalive={settings.HTTP_MAX_KEEPALIVE_CONNECTIONS}, http2={settings.HTTP_ENABLE_HTTP2}"
+            )
+        return cls._client
+
+    @classmethod
+    async def close_client(cls):
+        """Close the shared HTTP client"""
+        if cls._client is not None:
+            await cls._client.aclose()
+            cls._client = None
+
     async def is_available(self) -> bool:
         try:
-            response = requests.get(f"{self.base_url}/version")
-            return response.ok
+            client = self.get_client()
+            response = await client.get(f"{self.base_url}/version")
+            return response.is_success
         except Exception:
             return False
 
@@ -95,11 +129,12 @@ class TikaService:
             endpoint = self._choose_tika_endpoint(mime_type)
 
             # Send a request to Tika
-            response = requests.put(
-                f"{self.base_url}/{endpoint}", data=file_content, headers=headers
+            client = self.get_client()
+            response = await client.put(
+                f"{self.base_url}/{endpoint}", content=file_content, headers=headers
             )
 
-            if not response.ok:
+            if not response.is_success:
                 raise HTTPException(
                     status_code=response.status_code,
                     detail=f"Tika service error: {response.text}",

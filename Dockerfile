@@ -25,6 +25,11 @@ WORKDIR /app
 ARG INSTALL_DEV=false
 
 COPY . .
+
+# Make entrypoint script executable and ensure app is owned by deploy
+RUN mv /app/entrypoint.sh /usr/local/bin/entrypoint.sh \
+ && chmod +x /usr/local/bin/entrypoint.sh
+
 RUN pip install --upgrade pip
 RUN pip install uv
 # Install project with or without dev extras based on INSTALL_DEV
@@ -42,5 +47,5 @@ USER deploy
 # Make port 8000 available to the world outside this container
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use entrypoint script to allow appending extra args
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

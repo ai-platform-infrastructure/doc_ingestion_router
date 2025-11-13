@@ -14,6 +14,18 @@ class Settings(BaseSettings):
     TIKA_USER: str
     TIKA_PASSWORD: str
 
+    # HTTP Client connection pool settings
+    HTTP_MAX_CONNECTIONS: int = 100
+    HTTP_MAX_KEEPALIVE_CONNECTIONS: int = 20
+    HTTP_KEEPALIVE_EXPIRY: float = 30.0
+    HTTP_ENABLE_HTTP2: bool = True
+
+    # HTTP Client timeout settings (in seconds)
+    HTTP_TIMEOUT_CONNECT: float = 10.0
+    HTTP_TIMEOUT_READ: float = 600.0
+    HTTP_TIMEOUT_WRITE: float = 60.0
+    HTTP_TIMEOUT_POOL: float = 10.0
+
     @property
     def tika_url_with_auth(self) -> str:
         """Constructs Tika URL with authentication credentials"""
